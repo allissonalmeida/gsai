@@ -90,15 +90,38 @@ import streamlit as st
 # print('Resultado: ',answer_4['result'])
 
 
-#st.image("logo.png", caption="JuridicaMente", width=200)
+# Configuration
 col1, col2, col3 = st.columns([1, 3, 1])  # Ajuste as proporções conforme necessário
 with col2:
     st.image("logo.png", caption="JuridicaMente", width=200)
     
-st.title("Busca semântica de resultados jurídicos alimentada por IA para aproximar você das decisões, alegações e processos mais relevantes.")
-#st.write("Bem-vindo ao JuridicaMente v1.0.0!")
+st.markdown(
+    """
+    <style>
+    input[type="text"] {
+        font-size: 20px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-query = st.text_input("Digite sua pergunta:")
+st.markdown(
+    """
+    <style>
+    textarea {
+        font-size: 20px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+    
+st.title("Busca semântica de resultados jurídicos alimentada por IA para aproximar você das decisões, alegações e processos mais relevantes.")
+
+
+# Formulario de busca
+query = st.text_area("Digite sua pergunta:")
 buscar = st.button("Buscar")
 
 if buscar and query:
@@ -106,4 +129,4 @@ if buscar and query:
         #response = chain.invoke(query)
         st.subheader("Resposta:")
         #st.write(response['result'])
-        st.write('Aqui sera apresentado o resultado da busca')
+        st.write("Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.")
