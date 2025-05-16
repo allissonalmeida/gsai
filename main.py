@@ -91,10 +91,12 @@ import streamlit as st
 
 
 # Configuration
-col1, col2, col3 = st.columns([1, 3, 1])  # Ajuste as proporções conforme necessário
-with col2:
-    st.image("logo.png", caption="JuridicaMente", width=200)
-    
+st.set_page_config(
+    page_title="JuridicaMente",
+    page_icon="⚖️",
+)
+
+
 st.markdown(
     """
     <style>
@@ -116,6 +118,12 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+col1, col2, col3 = st.columns([2, 3, 2])  
+with col2:
+    st.image("logo.png", caption="JuridicaMente", width=200)
+    
+
     
 st.title("Busca semântica de resultados jurídicos alimentada por IA para aproximar você das decisões, alegações e processos mais relevantes.")
 
