@@ -62,7 +62,7 @@ import streamlit as st
 # de normas ambientais pela Empresa de Construção?'''
 # query_2 = 'Responda apenas com base no input fornecido. Qual foi a decisão no caso de fraude financeira?'
 # query_3 = 'Responda apenas com base no input fornecido. Quais foram as alegações no caso de negligência médica?'
-# query_4 = 'Responda apenas com base no input fornecido. Quais foram as alegações no caso de Número do Processo: 822162' #disputa contratual
+# query_4 = 'Responda apenas com base no input fornecido. Quais foram as alegações no caso de Número do Processo: 822162' 
 
 
 # llm = ChatOpenAI(model='gpt-3.5-turbo', temperature=0.2)
@@ -137,4 +137,4 @@ if buscar and query:
         #response = chain.invoke(query)
         st.subheader("Resposta:")
         #st.write(response['result'])
-        st.write("Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.")
+        st.write("Alegações de quebra de contrato pela Empresa W, que afirmou que o Fornecedor K não entregou os materiais conforme os termos acordados. Detalhes do contrato especificaram entregas mensais de  materiais  de  construção  de  alta  qualidade.  O  Fornecedor  K  argumentou  que  a  Empresa  W mudou as especificações sem aviso prévio. A resolução foi a favor da Empresa W, com o tribunal ordenando ao Fornecedor K o pagamento de uma indenização de $300,000.")
