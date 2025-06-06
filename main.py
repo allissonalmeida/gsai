@@ -121,7 +121,7 @@ try:
             name=index_name,
             dimension=dimension,
             metric=metric,
-            spec=PodSpec(environment="gcp-starter") # Exemplo: 'gcp-starter', 'us-west1-gcp', 'us-east-1-aws', etc.
+            spec=PodSpec(environment="us-east-1-aws") # Exemplo: 'gcp-starter', 'us-west1-gcp', 'us-east-1-aws', etc.
         )
         # Opção 2: Se você tiver um plano Serverless, use ServerlessSpec.
         # Descomente e ajuste se for seu caso:
