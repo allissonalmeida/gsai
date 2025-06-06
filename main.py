@@ -2,10 +2,11 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_pinecone import PineconeVectorStore
 from langchain.chains import RetrievalQA
-from pinecone import Pinecone
+from pinecone import Pinecone, PodSpec # Importação adicionada para PodSpec ou ServerlessSpec
 import os
 import zipfile
 import streamlit as st
+import time # Importação adicionada para possível atraso
 
 # Importações para DeepSeek (a API do DeepSeek é compatível com o padrão OpenAI)
 from langchain_openai import ChatOpenAI
@@ -40,15 +41,20 @@ if not os.path.exists(extracted_folder_path):
 # Extrai os documentos do ZIP
 try:
     with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+        st.info(f"Extraindo documentos de '{zip_file_path}' para '{extracted_folder_path}'...")
         zip_ref.extractall(extracted_folder_path)
+        st.success("Documentos extraídos com sucesso!")
 except FileNotFoundError:
     st.error(f"Erro: O arquivo ZIP '{zip_file_path}' não foi encontrado. Certifique-se de que ele está na mesma pasta do seu script.")
     st.stop() # Para a execução do script se o arquivo não for encontrado
+except Exception as e:
+    st.error(f"Erro ao extrair o arquivo ZIP. Verifique se ele está válido. Erro: {e}")
+    st.stop()
 
 documents = []
-# Lista para armazenar nomes de arquivos PDF que falharam no carregamento
 failed_pdf_loads = []
 
+st.info("Carregando e processando documentos PDF...")
 for filename in os.listdir(extracted_folder_path):
     if filename.endswith(".pdf"):
         file_path = os.path.join(extracted_folder_path, filename)
@@ -65,68 +71,101 @@ if failed_pdf_loads:
 if not documents:
     st.error("Erro: Nenhum documento PDF foi carregado ou extraído com sucesso. Verifique o arquivo ZIP e os PDFs.")
     st.stop()
+st.success(f"{len(documents)} documentos PDF carregados.")
 
 # Split documents into chunks
+st.info("Dividindo documentos em chunks...")
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=1000,
     chunk_overlap=100,
     length_function=len
 )
-# É crucial que 'documents' contenha objetos de Document ou apenas strings
-# Aqui, presumimos que loader.load() retorna objetos Document, então pegamos page_content
-# Se loader.load() já retornar strings, removemos o .page_content
-# chunks = text_splitter.create_documents([doc.page_content for doc in documents])
-# Uma maneira mais robusta, caso 'documents' já sejam strings ou mistos:
-processed_documents = []
+
+processed_documents_content = []
 for doc in documents:
     if hasattr(doc, 'page_content'):
-        processed_documents.append(doc.page_content)
+        processed_documents_content.append(doc.page_content)
     elif isinstance(doc, str):
-        processed_documents.append(doc)
+        processed_documents_content.append(doc)
     else:
         print(f"Aviso: Documento de tipo inesperado ignorado: {type(doc)}")
 
-if not processed_documents:
+if not processed_documents_content:
     st.error("Erro: Nenhum conteúdo válido foi extraído dos documentos para chunking.")
     st.stop()
 
-chunks = text_splitter.create_documents(processed_documents)
+chunks = text_splitter.create_documents(processed_documents_content)
+st.success(f"{len(chunks)} chunks de texto criados.")
+
 
 # ---
-## Embeddings e Vector Store
+## Embeddings e Vector Store (Lógica de CRIAÇÃO DE ÍNDICE APRIMORADA)
 # ---
 
-# Inicializa os embeddings com o modelo DeepSeek (usando a interface OpenAI)
-# ATENÇÃO: Se você mudar o modelo de embedding, DEVE REINDEXAR SEUS DOCUMENTOS NO PINECONE.
-# Isso significa que você precisará apagar o índice 'llm' existente no Pinecone
-# e então rodar este código para recriá-lo com os novos embeddings do DeepSeek.
 try:
     embeddings = OpenAIEmbeddings(
-        model="deepseek-embed", # << VERIFIQUE O NOME EXATO DO MODELO DE EMBEDDING DO DEEPSEEK
+        model="deepseek-embed", # << VERIFIQUE O NOME EXATO DO MODELO DE EMBEDDING DO DEEPSEEK (ex: "deepseek-ai/deepseek-ai-embedding-v2.0" ou similar, conforme doc)
         api_key=os.environ['DEEPSEEK_API_KEY'],
-        base_url="https://api.deepseek.com/v1", # Endpoint padrão da API do DeepSeek - VERIFIQUE PARA EMBEDDINGS
+        base_url="https://api.deepseek.com/v1", # Endpoint padrão da API do DeepSeek - VERIFIQUE SE É O MESMO PARA EMBEDDINGS
     )
+    # Testar se o modelo de embedding está funcionando (opcional, mas útil para depuração)
+    _ = embeddings.embed_query("teste de embedding")
+    st.success("Modelo de embedding DeepSeek inicializado com sucesso!")
 except Exception as e:
-    st.error(f"Erro ao inicializar embeddings DeepSeek. Verifique 'DEEPSEEK_API_KEY', 'model' e 'base_url'. Erro: {e}")
+    st.error(f"Erro ao inicializar ou testar embeddings DeepSeek. Verifique 'DEEPSEEK_API_KEY', o nome do 'model' e o 'base_url'. Erro: {e}")
     st.stop()
 
 
-# Cria ou obtém o índice Pinecone
+# NOME DO ÍNDICE PINECONE
 index_name = 'llm'
+# --- CRÍTICO: VERIFIQUE ESTAS INFORMAÇÕES NA DOCUMENTAÇÃO DO DEEPSEEK OU AO CRIAR O ÍNDICE NO PINECONE ---
+# A dimensão DEVE ser a dimensão de saída do seu modelo de embedding DeepSeek.
+# O modelo 'all-MiniLM-L6-v2' (popular) tem 384. OpenAI 'ada-002' tem 1536.
+# DeepSeek pode ter uma dimensão diferente (ex: 1024, 2048, etc.).
+dimension = 1024 # << AJUSTE ESTA DIMENSÃO PARA A SAÍDA CORRETA DO SEU MODELO DE EMBEDDING DEEPSEEK
+metric = 'cosine' # Métrica de similaridade (geralmente 'cosine' para embeddings)
+
+# Lógica para verificar e criar o índice Pinecone
 try:
+    st.info(f"Verificando a existência do índice '{index_name}' no Pinecone...")
+    existing_indexes = [index['name'] for index in pinecone_client.list_indexes()]
+
+    if index_name not in existing_indexes:
+        st.warning(f"Índice '{index_name}' não encontrado. Criando novo índice no Pinecone...")
+        pinecone_client.create_index(
+            name=index_name,
+            dimension=dimension,
+            metric=metric,
+            # --- CRÍTICO: AJUSTE cloud e region CONFORME SEU PLANO/PREFERÊNCIA NO PINECONE ---
+            # Para planos "Starter" ou "Free", geralmente é "aws" e "us-west-2" ou "us-east-1".
+            # VERIFIQUE SEU PAINEL DO PINECONE para a região exata onde você tem permissão para criar.
+            spec=PodSpec(environment="gcp-starter", region="us-central1") # Exemplo para Pod-based Starter, AJUSTE CONFORME O SEU!
+            # Ou para serverless (se disponível no seu plano):
+            # spec={"serverless": {"cloud": "aws", "region": "us-east-1"}}
+        )
+        st.success(f"Índice '{index_name}' criado com sucesso! Aguardando o índice ficar pronto...")
+        # É importante esperar um pouco para o índice ser provisionado
+        while not pinecone_client.describe_index(index_name).status.ready:
+            time.sleep(1) # Espera 1 segundo
+        st.success("Índice pronto para uso!")
+
+    # Agora que sabemos que o índice existe (ou foi criado), podemos nos conectar a ele.
     pinecone_index = pinecone_client.Index(index_name)
-    # Verifica se o índice está vazio ou precisa ser preenchido
+
+    # Verificar se o índice está vazio e preenchê-lo
     index_stats = pinecone_index.describe_index_stats()
     if index_stats.total_vector_count == 0:
-        st.info("Índice Pinecone vazio. Preenchendo com novos embeddings...")
+        st.info("Índice Pinecone está vazio. Preenchendo com novos embeddings dos documentos (isso pode levar tempo)...")
+        # from_documents é o método para adicionar documentos e seus embeddings
         vector_store = PineconeVectorStore.from_documents(chunks, embeddings, index_name=index_name, text_key='page_content')
         st.success("Índice Pinecone preenchido com sucesso!")
     else:
         st.info(f"Índice Pinecone '{index_name}' já existe com {index_stats.total_vector_count} vetores. Usando índice existente.")
+        # Se o índice já tem vetores, apenas inicializamos o vector_store com ele
         vector_store = PineconeVectorStore(index=pinecone_index, embedding=embeddings, text_key='page_content')
 
 except Exception as e:
-    st.error(f"Erro ao conectar ou criar índice Pinecone. Verifique 'PINECONE_API_KEY' e o nome do índice. Erro: {e}")
+    st.error(f"Erro crítico ao gerenciar ou conectar ao índice Pinecone. Por favor, verifique: 'PINECONE_API_KEY', nome do índice, DIMENSÃO do embedding e a CONFIGURAÇÃO DE REGIÃO/CLOUD (spec). Erro: {e}")
     st.stop()
 
 
@@ -137,13 +176,16 @@ except Exception as e:
 # Inicializa o LLM com um modelo de chat DeepSeek (usando a interface OpenAI)
 try:
     llm = ChatOpenAI(
-        model="deepseek-chat", # << VERIFIQUE O NOME EXATO DO MODELO DE CHAT DO DEEPSEEK
+        model="deepseek-chat", # << VERIFIQUE O NOME EXATO DO MODELO DE CHAT DO DEEPSEEK (ex: "deepseek-coder", "deepseek-math", etc.)
         api_key=os.environ['DEEPSEEK_API_KEY'],
         base_url="https://api.deepseek.com/v1", # Endpoint padrão da API do DeepSeek
         temperature=0.2,
     )
+    # Teste simples para ver se o LLM está acessível
+    _ = llm.invoke("Olá")
+    st.success("Modelo de chat DeepSeek inicializado com sucesso!")
 except Exception as e:
-    st.error(f"Erro ao inicializar LLM DeepSeek. Verifique 'DEEPSEEK_API_KEY', 'model' e 'base_url'. Erro: {e}")
+    st.error(f"Erro ao inicializar ou testar LLM DeepSeek. Verifique 'DEEPSEEK_API_KEY', o nome do 'model' e o 'base_url'. Erro: {e}")
     st.stop()
 
 
