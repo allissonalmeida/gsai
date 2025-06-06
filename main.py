@@ -1,27 +1,38 @@
-import os
-import zipfile
-import streamlit as st
-import time
-
-from langchain_openai import ChatOpenAI
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_pinecone import PineconeVectorStore
+from langchain.chains import RetrievalQA
 from pinecone import Pinecone, PodSpec # Mantenha a importação de PodSpec
+import os
+import zipfile
+import streamlit as st
+import time # Importação adicionada para possível atraso
+
+# Importações para o LLM DeepSeek (via interface OpenAI)
+from langchain_openai import ChatOpenAI
+# Importação para o modelo de Embedding de Código Aberto (HuggingFace)
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # ---
 ## Configuração e Inicialização
 # ---
 
+# Configura as chaves de API
 os.environ['PINECONE_API_KEY'] = st.secrets['PINECONE_API_KEY']
-os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY']
+os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY'] # Chave de API para o LLM DeepSeek
 
+# ---
+## Continuação do Código Principal
+# ---
+
+# INICIALIZA O CLIENTE PINECONE AQUI, FORA DE QUALQUER BLOCO CONDICIONAL/FUNÇÃO.
+# ISSO GARANTE QUE 'pinecone_client' ESTEJA DEFINIDO GLOBALMENTE.
 try:
     pinecone_client = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
 except Exception as e:
     st.error(f"Erro ao inicializar o cliente Pinecone. Verifique sua 'PINECONE_API_KEY'. Erro: {e}")
     st.stop()
+
 
 # ---
 ## Carregamento e Processamento de Documentos
@@ -30,9 +41,11 @@ except Exception as e:
 zip_file_path = 'documentos.zip'
 extracted_folder_path = 'docs'
 
+# Garante que a pasta 'docs' exista
 if not os.path.exists(extracted_folder_path):
     os.makedirs(extracted_folder_path)
 
+# Extrai os documentos do ZIP
 try:
     with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
         st.info(f"Extraindo documentos de '{zip_file_path}' para '{extracted_folder_path}'...")
@@ -113,25 +126,15 @@ try:
     if index_name not in existing_indexes:
         st.warning(f"Índice '{index_name}' não encontrado. Criando novo índice no Pinecone...")
 
-        # --- AJUSTE AQUI PARA A CONFIGURAÇÃO DO SEU ÍNDICE PINECONE ---
-        # Opção 1: Para a maioria dos planos Starter (Pod-based), use 'environment'.
-        # SUBSTITUA "gcp-starter" PELA SUA ENVIRONMENT/REGIÃO EXATA.
-        # Você pode encontrar isso no seu painel do Pinecone, ao criar um índice manual.
+        # --- AQUI ESTÁ A CORREÇÃO FINAL PARA O NOVO PROJETO 'gsai-project' ---
+        # SUBSTITUA "SEU_NOVO_ENVIRONMENT_DO_GSAI_PROJECT" pelo ambiente exato (e.g., "us-east-1-aws")
+        # que o Pinecone atribuiu ao seu novo projeto 'gsai-project'.
         pinecone_client.create_index(
             name=index_name,
             dimension=dimension,
             metric=metric,
-            spec=PodSpec(environment="us-east-1-aws") # Exemplo: 'gcp-starter', 'us-west1-gcp', 'us-east-1-aws', etc.
+            spec=PodSpec(environment="SEU_NOVO_ENVIRONMENT_DO_GSAI_PROJECT") # <-- AJUSTE AQUI!
         )
-        # Opção 2: Se você tiver um plano Serverless, use ServerlessSpec.
-        # Descomente e ajuste se for seu caso:
-        # from pinecone import ServerlessSpec
-        # pinecone_client.create_index(
-        #     name=index_name,
-        #     dimension=dimension,
-        #     metric=metric,
-        #     spec=ServerlessSpec(cloud="aws", region="us-east-1") # Ajuste cloud e region
-        # )
 
         st.success(f"Índice '{index_name}' criado com sucesso! Aguardando o índice ficar pronto...")
         while not pinecone_client.describe_index(index_name).status.ready:
@@ -149,7 +152,7 @@ try:
         vector_store = PineconeVectorStore(index=pinecone_index, embedding=embeddings, text_key='page_content')
 
 except Exception as e:
-    st.error(f"Erro crítico ao gerenciar ou conectar ao índice Pinecone. Por favor, verifique: 'PINECONE_API_KEY', o nome do índice, DIMENSÃO (384), e a CONFIGURAÇÃO 'spec' (environment/cloud/region). Erro: {e}")
+    st.error(f"Erro crítico ao gerenciar ou conectar ao índice Pinecone. Por favor, verifique: 'PINECONE_API_KEY', o nome do índice, DIMENSÃO (384), e a CONFIGURAÇÃO 'spec' (environment/cloud/region). O erro foi: {e}")
     st.stop()
 
 # ---
