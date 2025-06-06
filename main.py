@@ -22,6 +22,19 @@ os.environ['PINECONE_API_KEY'] = st.secrets['PINECONE_API_KEY']
 os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY'] # Chave de API para o LLM DeepSeek
 
 # ---
+## Continuação do Código Principal
+# ---
+
+# INICIALIZA O CLIENTE PINECONE AQUI, FORA DE QUALQUER BLOCO CONDICIONAL/FUNÇÃO.
+# ISSO GARANTE QUE 'pinecone_client' ESTEJA DEFINIDO GLOBALMENTE.
+try:
+    pinecone_client = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
+except Exception as e:
+    st.error(f"Erro ao inicializar o cliente Pinecone. Verifique sua 'PINECONE_API_KEY'. Erro: {e}")
+    st.stop()
+
+
+# ---
 ## Carregamento e Processamento de Documentos
 # ---
 
@@ -29,7 +42,7 @@ zip_file_path = 'documentos.zip'
 extracted_folder_path = 'docs'
 
 # Garante que a pasta 'docs' exista
-if not os.path.exists(extracted_folder_path):
+if not os.path.exists(extracted_folder_folder_path):
     os.makedirs(extracted_folder_path)
 
 # Extrai os documentos do ZIP
