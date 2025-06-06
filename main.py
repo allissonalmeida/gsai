@@ -7,7 +7,6 @@ import os
 import zipfile
 import streamlit as st
 
-# Importações para DeepSeek (a API do DeepSeek é compatível com o padrão OpenAI)
 from langchain_openai import ChatOpenAI
 from langchain_openai import OpenAIEmbeddings
 
@@ -17,12 +16,7 @@ from langchain_openai import OpenAIEmbeddings
 
 # Configura as chaves de API
 os.environ['PINECONE_API_KEY'] = st.secrets['PINECONE_API_KEY']
-os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY'] # Nova chave de API para o DeepSeek
-
-# ---
-## Continuação do Código Principal
-# Não há mais o bloco de diagnóstico de modelos Gemini aqui, pois estamos usando DeepSeek.
-# ---
+os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY'] -
 
 # Inicializa o cliente Pinecone
 pinecone_client = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
@@ -34,7 +28,6 @@ pinecone_client = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
 zip_file_path = 'documentos.zip'
 extracted_folder_path = 'docs'
 
-# CORREÇÃO AQUI: zipfile.ZipFile (com 'F' maiúsculo)
 with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
     zip_ref.extractall(extracted_folder_path)
 
@@ -58,13 +51,10 @@ chunks = text_splitter.create_documents([doc.page_content for doc in documents])
 # ---
 
 # Inicializa os embeddings com o modelo DeepSeek (usando a interface OpenAI)
-# ATENÇÃO: Se você mudar o modelo de embedding, DEVE REINDEXAR SEUS DOCUMENTOS NO PINECONE.
-# Isso significa que você precisará apagar o índice 'llm' existente no Pinecone
-# e então rodar este código para recriá-lo com os novos embeddings do DeepSeek.
 embeddings = OpenAIEmbeddings(
-    model="deepseek-embeddings", # << VERIFIQUE O NOME EXATO DO MODELO DE EMBEDDING DO DEEPSEEK
+    model="deepseek-embeddings",
     api_key=os.environ['DEEPSEEK_API_KEY'],
-    base_url="https://api.deepseek.com/v1", # Endpoint padrão da API do DeepSeek
+    base_url="https://api.deepseek.com/v1",
 )
 
 # Cria ou obtém o índice Pinecone
@@ -72,8 +62,6 @@ index_name = 'llm'
 pinecone_index = pinecone_client.Index(index_name)
 
 # Inicializa o PineconeVectorStore
-# Ao fazer isso pela primeira vez com o novo modelo de embedding,
-# ele irá popular seu índice no Pinecone com os novos vetores.
 vector_store = PineconeVectorStore(index=pinecone_index, embedding=embeddings, text_key='page_content')
 
 
@@ -95,9 +83,11 @@ retriever = vector_store.as_retriever(search_type='similarity', search_kwargs={'
 # Cria a cadeia de RetrievalQA
 chain = RetrievalQA.from_chain_type(llm=llm, chain_type='stuff', retriever=retriever)
 
-# ---
+
+
+
 ## Interface Streamlit
-# ---
+
 
 # Configurações da página Streamlit
 st.set_page_config(
