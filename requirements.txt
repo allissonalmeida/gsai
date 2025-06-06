@@ -1,0 +1,26 @@
+pypdf2
+tabula-py
+camelot-py[cv]
+pycryptodome
+jpype1
+langchain 
+pymupdf 
+langchain-openai 
+langchain-community 
+pinecone-client 
+pyyaml 
+python-dotenv
+
+#conda install -c conda-forge \
+#    pypdf2 \
+#    tabula-py \
+#    camelot-py \
+#    pycryptodome \
+#    jpype1 \
+#    langchain \
+#    pymupdf \
+#    langchain-openai \
+#    langchain-community \
+#    pinecone-client \
+#    pyyaml \
+#    python-dotenv
