@@ -133,7 +133,7 @@ try:
             name=index_name,
             dimension=dimension,
             metric=metric,
-            spec=PodSpec(environment="SEU_NOVO_ENVIRONMENT_DO_GSAI_PROJECT") # <-- AJUSTE AQUI!
+            spec=PodSpec(environment="us-east-1-aws") 
         )
 
         st.success(f"Índice '{index_name}' criado com sucesso! Aguardando o índice ficar pronto...")
