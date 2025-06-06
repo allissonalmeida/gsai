@@ -1,10 +1,11 @@
 streamlit
-langchain>=0.2.0 # Ou a versão que você tem
+langchain>=0.2.0
 langchain-core
 langchain-community
 langchain-pinecone
 langchain-google-genai
-pinecone-client>=3.0.0 # ou a versão que você tem
+pinecone-client>=3.0.0 
+pinecone
 PyMuPDF
 PyYAML
 sentence-transformers
