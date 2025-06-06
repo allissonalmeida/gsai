@@ -8,9 +8,10 @@ import zipfile
 import streamlit as st
 import time # Importação adicionada para possível atraso
 
-# Importações para DeepSeek (a API do DeepSeek é compatível com o padrão OpenAI)
+# Importações para o LLM DeepSeek (via interface OpenAI)
 from langchain_openai import ChatOpenAI
-from langchain_openai import OpenAIEmbeddings
+# Importação para o modelo de Embedding de Código Aberto (HuggingFace)
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # ---
 ## Configuração e Inicialização
@@ -18,14 +19,7 @@ from langchain_openai import OpenAIEmbeddings
 
 # Configura as chaves de API
 os.environ['PINECONE_API_KEY'] = st.secrets['PINECONE_API_KEY']
-os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY'] # Nova chave de API para o DeepSeek
-
-# ---
-## Continuação do Código Principal
-# ---
-
-# Inicializa o cliente Pinecone
-pinecone_client = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
+os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY'] # Chave de API para o LLM DeepSeek
 
 # ---
 ## Carregamento e Processamento de Documentos
@@ -46,7 +40,7 @@ try:
         st.success("Documentos extraídos com sucesso!")
 except FileNotFoundError:
     st.error(f"Erro: O arquivo ZIP '{zip_file_path}' não foi encontrado. Certifique-se de que ele está na mesma pasta do seu script.")
-    st.stop() # Para a execução do script se o arquivo não for encontrado
+    st.stop()
 except Exception as e:
     st.error(f"Erro ao extrair o arquivo ZIP. Verifique se ele está válido. Erro: {e}")
     st.stop()
@@ -103,26 +97,22 @@ st.success(f"{len(chunks)} chunks de texto criados.")
 # ---
 
 try:
-    embeddings = OpenAIEmbeddings(
-        model="deepseek-embed", # << VERIFIQUE O NOME EXATO DO MODELO DE EMBEDDING DO DEEPSEEK (ex: "deepseek-ai/deepseek-ai-embedding-v2.0" ou similar, conforme doc)
-        api_key=os.environ['DEEPSEEK_API_KEY'],
-        base_url="https://api.deepseek.com/v1", # Endpoint padrão da API do DeepSeek - VERIFIQUE SE É O MESMO PARA EMBEDDINGS
-    )
+    # Inicializa os embeddings com um modelo HuggingFace (modelo leve e eficaz)
+    # Certifique-se de ter 'sentence-transformers' instalado (pip install sentence-transformers)
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
     # Testar se o modelo de embedding está funcionando (opcional, mas útil para depuração)
     _ = embeddings.embed_query("teste de embedding")
-    st.success("Modelo de embedding DeepSeek inicializado com sucesso!")
+    st.success("Modelo de embedding HuggingFace inicializado com sucesso!")
 except Exception as e:
-    st.error(f"Erro ao inicializar ou testar embeddings DeepSeek. Verifique 'DEEPSEEK_API_KEY', o nome do 'model' e o 'base_url'. Erro: {e}")
+    st.error(f"Erro ao inicializar ou testar embeddings HuggingFace. Verifique a instalação de 'sentence-transformers'. Erro: {e}")
     st.stop()
 
 
 # NOME DO ÍNDICE PINECONE
 index_name = 'llm'
-# --- CRÍTICO: VERIFIQUE ESTAS INFORMAÇÕES NA DOCUMENTAÇÃO DO DEEPSEEK OU AO CRIAR O ÍNDICE NO PINECONE ---
-# A dimensão DEVE ser a dimensão de saída do seu modelo de embedding DeepSeek.
-# O modelo 'all-MiniLM-L6-v2' (popular) tem 384. OpenAI 'ada-002' tem 1536.
-# DeepSeek pode ter uma dimensão diferente (ex: 1024, 2048, etc.).
-dimension = 1024 # << AJUSTE ESTA DIMENSÃO PARA A SAÍDA CORRETA DO SEU MODELO DE EMBEDDING DEEPSEEK
+# --- CRÍTICO: A dimensão para 'sentence-transformers/all-MiniLM-L6-v2' é 384 ---
+dimension = 384 # AJUSTADO PARA A DIMENSÃO DO MODELO all-MiniLM-L6-v2
 metric = 'cosine' # Métrica de similaridade (geralmente 'cosine' para embeddings)
 
 # Lógica para verificar e criar o índice Pinecone
@@ -139,7 +129,8 @@ try:
             # --- CRÍTICO: AJUSTE cloud e region CONFORME SEU PLANO/PREFERÊNCIA NO PINECONE ---
             # Para planos "Starter" ou "Free", geralmente é "aws" e "us-west-2" ou "us-east-1".
             # VERIFIQUE SEU PAINEL DO PINECONE para a região exata onde você tem permissão para criar.
-            spec=PodSpec(environment="gcp-starter", region="us-central1") # Exemplo para Pod-based Starter, AJUSTE CONFORME O SEU!
+            # Exemplo para Pod-based Starter, AJUSTE CONFORME O SEU!
+            spec=PodSpec(environment="gcp-starter", region="us-central1") # OU seu ambiente/região
             # Ou para serverless (se disponível no seu plano):
             # spec={"serverless": {"cloud": "aws", "region": "us-east-1"}}
         )
@@ -165,7 +156,7 @@ try:
         vector_store = PineconeVectorStore(index=pinecone_index, embedding=embeddings, text_key='page_content')
 
 except Exception as e:
-    st.error(f"Erro crítico ao gerenciar ou conectar ao índice Pinecone. Por favor, verifique: 'PINECONE_API_KEY', nome do índice, DIMENSÃO do embedding e a CONFIGURAÇÃO DE REGIÃO/CLOUD (spec). Erro: {e}")
+    st.error(f"Erro crítico ao gerenciar ou conectar ao índice Pinecone. Por favor, verifique: 'PINECONE_API_KEY', nome do índice, DIMENSÃO do embedding (384), e a CONFIGURAÇÃO DE REGIÃO/CLOUD (spec). Erro: {e}")
     st.stop()
 
 
