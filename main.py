@@ -16,7 +16,7 @@ from langchain_openai import OpenAIEmbeddings
 
 # Configura as chaves de API
 os.environ['PINECONE_API_KEY'] = st.secrets['PINECONE_API_KEY']
-os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY'] -
+os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY']
 
 # Inicializa o cliente Pinecone
 pinecone_client = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
