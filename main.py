@@ -3,7 +3,7 @@ from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_pinecone import PineconeVectorStore
 from langchain.chains import RetrievalQA
 from pinecone import Pinecone
-import yaml
+#import yaml
 import os
 import zipfile # Importação da biblioteca zipfile
 import streamlit as st
@@ -18,12 +18,14 @@ import google.generativeai as genai
 # ---
 
 # Load configuration from config.yaml
-with open('config.yaml', 'r') as config_file:
-    config = yaml.safe_load(config_file)
+#with open('config.yaml', 'r') as config_file:
+#    config = yaml.safe_load(config_file)
 
 # Configura as chaves de API
-os.environ['PINECONE_API_KEY'] = config['PINECONE_API_KEY']
-os.environ['GOOGLE_API_KEY'] = config['GOOGLE_API_KEY']
+#os.environ['PINECONE_API_KEY'] = config['PINECONE_API_KEY']
+#os.environ['GOOGLE_API_KEY'] = config['GOOGLE_API_KEY']
+os.environ['PINECONE_API_KEY'] = st.secrets['PINECONE_API_KEY']
+os.environ['GOOGLE_API_KEY'] = st.secrets['GOOGLE_API_KEY']
 
 # ---
 ## Diagnóstico de Modelos Gemini
