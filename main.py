@@ -42,7 +42,7 @@ zip_file_path = 'documentos.zip'
 extracted_folder_path = 'docs'
 
 # Garante que a pasta 'docs' exista
-if not os.path.exists(extracted_folder_folder_path):
+if not os.path.exists(extracted_folder_path):
     os.makedirs(extracted_folder_path)
 
 # Extrai os documentos do ZIP
