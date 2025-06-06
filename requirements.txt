@@ -4,7 +4,6 @@ langchain-core
 langchain-community
 langchain-pinecone
 langchain-google-genai
-pinecone-client>=3.0.0 
 pinecone
 PyMuPDF
 PyYAML
