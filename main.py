@@ -1,38 +1,23 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
-from langchain_pinecone import PineconeVectorStore
 from langchain.chains import RetrievalQA
-from pinecone import Pinecone, PodSpec # Mantenha a importação de PodSpec
 import os
 import zipfile
 import streamlit as st
-import time # Importação adicionada para possível atraso
+import time
 
-# Importações para o LLM DeepSeek (via interface OpenAI)
-from langchain_openai import ChatOpenAI
-# Importação para o modelo de Embedding de Código Aberto (HuggingFace)
-from langchain_community.embeddings import HuggingFaceEmbeddings
+# --- Importações para a solução local com FAISS ---
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings # Mantém o embedding HuggingFace
+from langchain_openai import ChatOpenAI # Mantém o LLM DeepSeek
 
 # ---
 ## Configuração e Inicialização
 # ---
 
-# Configura as chaves de API
-os.environ['PINECONE_API_KEY'] = st.secrets['PINECONE_API_KEY']
-os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY'] # Chave de API para o LLM DeepSeek
-
-# ---
-## Continuação do Código Principal
-# ---
-
-# INICIALIZA O CLIENTE PINECONE AQUI, FORA DE QUALQUER BLOCO CONDICIONAL/FUNÇÃO.
-# ISSO GARANTE QUE 'pinecone_client' ESTEJA DEFINIDO GLOBALMENTE.
-try:
-    pinecone_client = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
-except Exception as e:
-    st.error(f"Erro ao inicializar o cliente Pinecone. Verifique sua 'PINECONE_API_KEY'. Erro: {e}")
-    st.stop()
-
+# Configura as chaves de API (apenas DEEPSEEK_API_KEY será usada, pois Pinecone não é mais necessário)
+os.environ['DEEPSEEK_API_KEY'] = st.secrets['DEEPSEEK_API_KEY']
+# PINECONE_API_KEY não é mais necessário para embeddings, mas pode deixar no secrets se usar em outro lugar
 
 # ---
 ## Carregamento e Processamento de Documentos
@@ -40,6 +25,7 @@ except Exception as e:
 
 zip_file_path = 'documentos.zip'
 extracted_folder_path = 'docs'
+faiss_index_path = "faiss_index" # Caminho para salvar/carregar o índice FAISS
 
 # Garante que a pasta 'docs' exista
 if not os.path.exists(extracted_folder_path):
@@ -104,7 +90,7 @@ chunks = text_splitter.create_documents(processed_documents_content)
 st.success(f"{len(chunks)} chunks de texto criados.")
 
 # ---
-## Embeddings e Vector Store
+## Embeddings e Vector Store (USANDO FAISS LOCALMENTE)
 # ---
 
 try:
@@ -115,50 +101,27 @@ except Exception as e:
     st.error(f"Erro ao inicializar ou testar embeddings HuggingFace. Verifique a instalação de 'sentence-transformers'. Erro: {e}")
     st.stop()
 
-index_name = 'llm'
-dimension = 384
-metric = 'cosine'
-
 try:
-    st.info(f"Verificando a existência do índice '{index_name}' no Pinecone...")
-    existing_indexes = [index['name'] for index in pinecone_client.list_indexes()]
-
-    if index_name not in existing_indexes:
-        st.warning(f"Índice '{index_name}' não encontrado. Criando novo índice no Pinecone...")
-
-        # --- AQUI ESTÁ A CORREÇÃO FINAL PARA O NOVO PROJETO 'gsai-project' ---
-        # SUBSTITUA "SEU_NOVO_ENVIRONMENT_DO_GSAI_PROJECT" pelo ambiente exato (e.g., "us-east-1-aws")
-        # que o Pinecone atribuiu ao seu novo projeto 'gsai-project'.
-        pinecone_client.create_index(
-            name=index_name,
-            dimension=dimension,
-            metric=metric,
-            spec=PodSpec(environment="us-east-1-aws") 
-        )
-
-        st.success(f"Índice '{index_name}' criado com sucesso! Aguardando o índice ficar pronto...")
-        while not pinecone_client.describe_index(index_name).status.ready:
-            time.sleep(1)
-        st.success("Índice pronto para uso!")
-
-    pinecone_index = pinecone_client.Index(index_name)
-    index_stats = pinecone_index.describe_index_stats()
-    if index_stats.total_vector_count == 0:
-        st.info("Índice Pinecone está vazio. Preenchendo com novos embeddings dos documentos (isso pode levar tempo)...")
-        vector_store = PineconeVectorStore.from_documents(chunks, embeddings, index_name=index_name, text_key='page_content')
-        st.success("Índice Pinecone preenchido com sucesso!")
+    st.info("Verificando se o índice FAISS já existe localmente...")
+    if os.path.exists(faiss_index_path):
+        st.success(f"Índice FAISS encontrado em '{faiss_index_path}'. Carregando...")
+        vector_store = FAISS.load_local(faiss_index_path, embeddings, allow_dangerous_deserialization=True)
+        st.success("Índice FAISS carregado com sucesso!")
     else:
-        st.info(f"Índice Pinecone '{index_name}' já existe com {index_stats.total_vector_count} vetores. Usando índice existente.")
-        vector_store = PineconeVectorStore(index=pinecone_index, embedding=embeddings, text_key='page_content')
+        st.warning(f"Índice FAISS não encontrado. Criando novo índice e salvando em '{faiss_index_path}' (isso pode levar tempo)...")
+        vector_store = FAISS.from_documents(chunks, embeddings)
+        vector_store.save_local(faiss_index_path)
+        st.success("Índice FAISS criado e salvo com sucesso!")
 
 except Exception as e:
-    st.error(f"Erro crítico ao gerenciar ou conectar ao índice Pinecone. Por favor, verifique: 'PINECONE_API_KEY', o nome do índice, DIMENSÃO (384), e a CONFIGURAÇÃO 'spec' (environment/cloud/region). O erro foi: {e}")
+    st.error(f"Erro crítico ao gerenciar ou conectar ao índice FAISS. Erro: {e}")
     st.stop()
 
 # ---
 ## Configuração do Modelo de Linguagem (LLM)
 # ---
 
+# Inicializa o LLM com um modelo de chat DeepSeek (usando a interface OpenAI)
 try:
     llm = ChatOpenAI(
         model="deepseek-chat",
@@ -166,24 +129,32 @@ try:
         base_url="https://api.deepseek.com/v1",
         temperature=0.2,
     )
+    # Teste simples para ver se o LLM está acessível
     _ = llm.invoke("Olá")
     st.success("Modelo de chat DeepSeek inicializado com sucesso!")
 except Exception as e:
     st.error(f"Erro ao inicializar ou testar LLM DeepSeek. Verifique 'DEEPSEEK_API_KEY', o nome do 'model' e o 'base_url'. Erro: {e}")
     st.stop()
 
+
+# Configura o retriever para buscar documentos semelhantes
 retriever = vector_store.as_retriever(search_type='similarity', search_kwargs={'k': 3})
+
+# Cria a cadeia de RetrievalQA
+from langchain.chains import RetrievalQA # Já importado, mas reforçando
 chain = RetrievalQA.from_chain_type(llm=llm, chain_type='stuff', retriever=retriever)
 
 # ---
 ## Interface Streamlit
 # ---
 
+# Configurações da página Streamlit
 st.set_page_config(
     page_title="JuridicaMente",
     page_icon="⚖️",
 )
 
+# Estilos CSS para os campos de texto
 st.markdown(
     """
     <style>
@@ -198,21 +169,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Colunas para o layout do logo
 col1, col2, col3 = st.columns([2, 3, 2])
 with col2:
     st.image("logo.png", caption="JuridicaMente", width=200)
 
+# Título principal da aplicação
 st.header("Busca semântica de resultados jurídicos por IA para aproximar você das decisões, alegações e processos mais relevantes.")
 
+# Formulário de busca
 query = st.text_area("Digite sua pergunta:")
 buscar = st.button("Buscar")
 
+# Lógica de busca quando o botão é clicado
 if buscar and query:
     if not os.environ.get('DEEPSEEK_API_KEY'):
         st.error("A chave 'DEEPSEEK_API_KEY' não está configurada. Por favor, adicione-a aos seus segredos do Streamlit.")
-        st.stop()
-    if not os.environ.get('PINECONE_API_KEY'):
-        st.error("A chave 'PINECONE_API_KEY' não está configurada. Por favor, adicione-a aos seus segredos do Streamlit.")
         st.stop()
 
     with st.spinner("Buscando resposta..."):
