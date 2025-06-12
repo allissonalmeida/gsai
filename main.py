@@ -1,3 +1,7 @@
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import os
 import streamlit as st
 import chromadb
@@ -329,7 +333,7 @@ st.markdown("<div class='logo-title-container'>", unsafe_allow_html=True)
 if os.path.exists("logo.png"):
     st.image("logo.png", width=120)
 else:
-    st.write("*(Logo FinAI)*")
+    st.write("*(Logo JuridicaMente)*")
 st.markdown("<h1>JuridicaMente</h1>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True) 
 st.markdown("<h3>Análise de Processos Jurídicos por IA</h3>", unsafe_allow_html=True)
