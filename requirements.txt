@@ -1,4 +1,5 @@
 streamlit
+chromadb
 langchain>=0.2.0
 langchain-core
 langchain-community
