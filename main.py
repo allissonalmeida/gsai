@@ -387,10 +387,10 @@ if vector_store and llm:
     with col_btn_examples:
         if st.button("Exemplos de Perguntas", key="show_examples"):
             st.markdown("""
-            - Responda apenas com base no input fornecido. Qual o número do processo que trata de Violação de normas ambientais pela Empresa de Construção?
-            - Responda apenas com base no input fornecido. Quais foram as alegações no caso de negligência médica?
-            - Responda apenas com base no input fornecido. Quais foram as alegações no caso de Número do Processo: XXXXXXX
-            - Responda apenas com base no input fornecido. Qual foi a decisão no caso de fraude financeira?
+            - Qual o número do processo que trata de Violação de normas ambientais pela Empresa de Construção?
+            - Quais foram as alegações no caso de negligência médica?
+            - Quais foram as alegações no caso de Número do Processo: XXXXXX
+            - Qual foi a decisão no caso de fraude financeira?
             """)
   
     with col_btn_search:
